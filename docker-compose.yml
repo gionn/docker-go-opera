@@ -1,0 +1,46 @@
+version: '3.4'
+
+services:
+  fantom:
+    build: .
+    restart: on-failure:5
+    ports:
+      - '5050:5050'
+      - '5050:5050/udp'
+      - '18545:18545'
+      - '127.0.0.1:18546:18546'
+      - '127.0.0.1:18547:18547'
+      - '127.0.0.1:19090:19090'
+    volumes:
+      - ./data:/root/.opera
+      - ./genesis:/genesis
+    environment:
+      FANTOM_HOSTNAME: ${FANTOM_HOSTNAME}
+      FANTOM_VERBOSITY: ${FANTOM_VERBOSITY:-2}
+      FANTOM_CACHE: ${FANTOM_CACHE:-32000}
+      STARTUP_ACTION: ${STARTUP_ACTION:-run}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`${FANTOM_HOSTNAME}`)"
+      - "traefik.http.routers.whoami.entrypoints=websecure"
+      - "traefik.http.routers.whoami.tls.certresolver=myresolver"
+      - "traefik.http.services.fantom.loadbalancer.server.port=18545"
+
+  traefik:
+    image: "traefik:v2.5"
+    container_name: "traefik"
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.myresolver.acme.email=${LETSENCRYPT_EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "./letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
